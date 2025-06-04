@@ -8,7 +8,7 @@ st.set_page_config(page_title="Straßensperrungen 🚧", layout="wide")
 st.title("🚧 Aktuelle Straßensperrungen und Umleitungen")
 st.markdown("Region: Südlohn, Oeding, Borken, Vreden, Ahaus, Bocholt")
 
-# Größere Bounding Box, damit mehr Daten kommen
+# Größere Bounding Box für mehr Daten
 bbox = (51.85, 6.60, 52.00, 7.00)
 
 query = f"""
@@ -17,6 +17,8 @@ query = f"""
   way["highway"]["access"="no"]({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
   way["highway"="construction"]({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
   way["traffic_sign"="detour"]({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
+  way["barrier"="blocked"]({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
+  way["access"="no"]({bbox[0]},{bbox[1]},{bbox[2]},{bbox[3]});
 );
 out body;
 >;
@@ -39,29 +41,23 @@ filter_option = st.radio("Anzeigen von:", ("Alle", "Nur Sperrungen", "Nur Umleit
 
 m = folium.Map(location=[51.93, 6.8], zoom_start=11)
 
-color_map = {
-    "detour": "orange",
-    "construction": "red",
-    "access_no": "red"
-}
-
 def get_info(tags):
     if tags.get("traffic_sign") == "detour":
-        return "Umleitung", color_map["detour"]
+        return "Umleitung", "orange"
     elif tags.get("highway") == "construction":
-        return "Baustelle", color_map["construction"]
-    elif tags.get("highway") and tags.get("access") == "no":
-        return "Sperrung", color_map["access_no"]
-    else:
+        return "Baustelle", "red"
+    elif tags.get("barrier") == "blocked":
+        return "Sperrung (Barriere)", "darkred"
+    elif tags.get("access") == "no":
         return "Sperrung", "red"
+    else:
+        return None, None
 
-# Deine Orte
+# Orte als Filter
 erlaubte_orte = {"Südlohn", "Oeding", "Borken", "Bocholt", "Vreden", "Ahaus"}
 
-# Sperrungen pro Ort
 sperrungen_pro_ort = {ort: [] for ort in erlaubte_orte}
 
-# Zum Debuggen: Alle gefundenen Wege mit Ort + Tags speichern
 debug_wege = []
 
 for el in data['elements']:
@@ -69,7 +65,10 @@ for el in data['elements']:
         tags = el.get("tags", {})
         typ, farbe = get_info(tags)
 
-        if filter_option == "Nur Sperrungen" and typ == "Umleitung":
+        if typ is None:
+            continue
+
+        if filter_option == "Nur Sperrungen" and "Umleitung" in typ:
             continue
         if filter_option == "Nur Umleitungen" and typ != "Umleitung":
             continue
@@ -86,11 +85,9 @@ for el in data['elements']:
             if beschreibung:
                 text += f"\n\n{beschreibung}"
 
-            # Nur erlaubte Orte in Übersicht
             if ort in erlaubte_orte:
                 sperrungen_pro_ort[ort].append(text)
 
-            # Für Debug alle speichern
             debug_wege.append({
                 "id": el.get("id"),
                 "typ": typ,
@@ -115,7 +112,6 @@ if keine_sperrungen_gefunden:
 st.markdown("## 🗺️ Karte der Sperrungen und Umleitungen")
 st_folium(m, width=1000, height=600)
 
-# Debug Bereich
 with st.expander("🛠️ Debug: Alle gefundenen Wege (inkl. Ort & Tags)"):
     st.write(f"Anzahl Wege insgesamt: {len(debug_wege)}")
     for weg in debug_wege:
