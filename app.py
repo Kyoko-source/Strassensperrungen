@@ -54,7 +54,11 @@ def get_info(tags):
     else:
         return "Sperrung", "red"
 
-list_sperrungen = []
+# Orte filtern
+erlaubte_orte = {"Südlohn", "Oeding", "Borken", "Bocholt", "Vreden", "Ahaus"}
+
+# Sperrungen pro Ort sammeln
+sperrungen_pro_ort = {ort: [] for ort in erlaubte_orte}
 
 for el in data['elements']:
     if el['type'] == 'way':
@@ -66,26 +70,32 @@ for el in data['elements']:
         if filter_option == "Nur Umleitungen" and typ != "Umleitung":
             continue
 
+        ort = tags.get("addr:city") or tags.get("place") or "Unbekannter Ort"
+        if ort not in erlaubte_orte:
+            continue
+
         coords = [nodes[nid] for nid in el['nodes'] if nid in nodes]
         if coords:
             folium.PolyLine(coords, color=farbe, weight=5, tooltip=typ).add_to(m)
 
-            # Orts- und Straßenname
-            ort = tags.get("addr:city") or tags.get("place") or "Unbekannter Ort"
             strasse = tags.get("name") or "Straßenname unbekannt"
-
             beschreibung = tags.get("description", "")
-            header = f"### 🚧 {typ} in {ort} — {strasse}"
+            text = f"**{typ}** — {strasse}"
             if beschreibung:
-                header += f"\n\n{beschreibung}"
+                text += f"\n\n{beschreibung}"
 
-            list_sperrungen.append(header)
+            sperrungen_pro_ort[ort].append(text)
 
-st.markdown("### 📋 Liste der aktuellen Sperrungen und Umleitungen")
-if list_sperrungen:
-    for eintrag in list_sperrungen:
-        st.markdown(eintrag)
-else:
+st.markdown("### 📋 Aktuelle Sperrungen und Umleitungen nach Ort")
+keine_sperrungen_gefunden = True
+for ort, sperrungen in sperrungen_pro_ort.items():
+    if sperrungen:
+        keine_sperrungen_gefunden = False
+        with st.expander(f"📍 {ort} ({len(sperrungen)})"):
+            for eintrag in sperrungen:
+                st.markdown(f"- {eintrag}")
+
+if keine_sperrungen_gefunden:
     st.info("Keine aktuellen Sperrungen oder Umleitungen gefunden.")
 
 st.markdown("### 🗺️ Karte der Sperrungen und Umleitungen")
