@@ -8,7 +8,8 @@ st.set_page_config(page_title="Straßensperrungen 🚧", layout="wide")
 st.title("🚧 Aktuelle Straßensperrungen und Umleitungen")
 st.markdown("Region: Südlohn, Oeding, Borken, Vreden, Ahaus, Bocholt")
 
-bbox = (51.89, 6.65, 51.97, 6.95)
+# Größere Bounding Box, damit mehr Daten kommen
+bbox = (51.85, 6.60, 52.00, 7.00)
 
 query = f"""
 [out:json][timeout:25];
@@ -54,11 +55,14 @@ def get_info(tags):
     else:
         return "Sperrung", "red"
 
-# Orte filtern
+# Deine Orte
 erlaubte_orte = {"Südlohn", "Oeding", "Borken", "Bocholt", "Vreden", "Ahaus"}
 
-# Sperrungen pro Ort sammeln
+# Sperrungen pro Ort
 sperrungen_pro_ort = {ort: [] for ort in erlaubte_orte}
+
+# Zum Debuggen: Alle gefundenen Wege mit Ort + Tags speichern
+debug_wege = []
 
 for el in data['elements']:
     if el['type'] == 'way':
@@ -71,8 +75,6 @@ for el in data['elements']:
             continue
 
         ort = tags.get("addr:city") or tags.get("place") or "Unbekannter Ort"
-        if ort not in erlaubte_orte:
-            continue
 
         coords = [nodes[nid] for nid in el['nodes'] if nid in nodes]
         if coords:
@@ -84,9 +86,21 @@ for el in data['elements']:
             if beschreibung:
                 text += f"\n\n{beschreibung}"
 
-            sperrungen_pro_ort[ort].append(text)
+            # Nur erlaubte Orte in Übersicht
+            if ort in erlaubte_orte:
+                sperrungen_pro_ort[ort].append(text)
 
-st.markdown("### 📋 Aktuelle Sperrungen und Umleitungen nach Ort")
+            # Für Debug alle speichern
+            debug_wege.append({
+                "id": el.get("id"),
+                "typ": typ,
+                "ort": ort,
+                "strasse": strasse,
+                "beschreibung": beschreibung,
+                "tags": tags
+            })
+
+st.markdown("## 📋 Aktuelle Sperrungen und Umleitungen nach Ort")
 keine_sperrungen_gefunden = True
 for ort, sperrungen in sperrungen_pro_ort.items():
     if sperrungen:
@@ -98,8 +112,15 @@ for ort, sperrungen in sperrungen_pro_ort.items():
 if keine_sperrungen_gefunden:
     st.info("Keine aktuellen Sperrungen oder Umleitungen gefunden.")
 
-st.markdown("### 🗺️ Karte der Sperrungen und Umleitungen")
+st.markdown("## 🗺️ Karte der Sperrungen und Umleitungen")
 st_folium(m, width=1000, height=600)
+
+# Debug Bereich
+with st.expander("🛠️ Debug: Alle gefundenen Wege (inkl. Ort & Tags)"):
+    st.write(f"Anzahl Wege insgesamt: {len(debug_wege)}")
+    for weg in debug_wege:
+        st.markdown(f"**ID:** {weg['id']} — **Typ:** {weg['typ']} — **Ort:** {weg['ort']} — **Straße:** {weg['strasse']}")
+        st.write("Tags:", weg['tags'])
 
 st.markdown("---")
 st.caption("Datenquelle: OpenStreetMap via Overpass API. Aktualität kann variieren.")
