@@ -9,7 +9,7 @@ import pandas as pd
 # Einstellungen
 # =========================
 
-IMAGE_PATH = "karte.png"
+IMAGE_PATH = "karte.jpg"
 
 GRID_COLS = list("ABCDEFGH")
 GRID_ROWS = [1, 2, 3, 4]   # 1 = oben
@@ -151,3 +151,4 @@ st.dataframe(df, use_container_width=True)
 
 export = json.dumps([asdict(p) for p in st.session_state.pins])
 st.download_button("Pins exportieren", export, "pins.json")
+
